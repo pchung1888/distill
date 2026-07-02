@@ -1,0 +1,3 @@
+# Binary fixtures: never apply line-ending conversion (raw PDF byte offsets
+# in the xref table break if LF/CRLF is rewritten on checkout).
+*.pdf binary
