@@ -35,8 +35,8 @@ Full spec: docs/HANDOFF.md. This is Ping's public AI-engineering portfolio piece
 
 | Field | Value |
 |---|---|
-| Last completed phase | (none yet) |
-| Last successful commit | (none yet) |
+| Last completed phase | Phase 0 - (see Phase Status) |
+| Last successful commit | 6692f03 |
 | Next action | Dispatch phase 1 |
 | Pending follow-ups | <status> <owner> -- <next action> |
 
@@ -44,21 +44,23 @@ Token budget rules: per user CLAUDE.md; log actuals in the Cost Log.
 
 ## Subagent Token Cost Log
 
-Rollup: total=0 | phases=0 | median/phase=0
+Rollup: total=64076 | phases=1 | median/phase=64076
 
 | # | Phase | Subagent type | Task description | Tokens | Duration | Outcome | Notes |
 |---|---|---|---|---|---|---|---|
+| 1 | 0 | claude | phase work | 64076 | 6 | PASS | VERIFY exit 0: uv sync + ruff all-checks-passed + pytest 1 passed. Driver re-ran gate independently. Secrets scan CLEAN on staged diff. uv installed via pip --user (was missing on machine); session-scoped PATH export used. |
 
 ## Agent Activity Log
 
 | Timestamp | Phase | Outcome | Commit |
 |---|---|---|---|
+| 18:35 | 0 | PASS | 6692f03 |
 
 ## Phase Status
 
 | Phase | Source | Title | Status | Commit | Subagent |
 |---|---|---|---|---|---|
-| 0 | Plan §Phase 0 | - Scaffold (runner: fable) | ⬜ Pending | -- | -- |
+| 0 | Plan §Phase 0 | - Scaffold (runner: fable) | OK Done | 6692f03 | claude |
 | 1 | Plan §Phase 1 | - Models (runner: fable) | ⬜ Pending | -- | -- |
 | 2 | Plan §Phase 2 | - LLM layer (runner: fable) | ⬜ Pending | -- | -- |
 | 3 | Plan §Phase 3 | - Sources (runner: fable) | ⬜ Pending | -- | -- |
