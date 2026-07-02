@@ -35,21 +35,22 @@ Full spec: docs/HANDOFF.md. This is Ping's public AI-engineering portfolio piece
 
 | Field | Value |
 |---|---|
-| Last completed phase | Phase 1 - (see Phase Status) |
-| Last successful commit | 6b676c9 |
-| Next action | Dispatch phase 2 |
+| Last completed phase | Phase 2 - (see Phase Status) |
+| Last successful commit | 03edc05 |
+| Next action | Dispatch phase 3 |
 | Pending follow-ups | <status> <owner> -- <next action> |
 
 Token budget rules: per user CLAUDE.md; log actuals in the Cost Log.
 
 ## Subagent Token Cost Log
 
-Rollup: total=137692 | phases=2 | median/phase=68846
+Rollup: total=210407 | phases=3 | median/phase=72715
 
 | # | Phase | Subagent type | Task description | Tokens | Duration | Outcome | Notes |
 |---|---|---|---|---|---|---|---|
 | 1 | 0 | claude | phase work | 64076 | 6 | PASS | VERIFY exit 0: uv sync + ruff all-checks-passed + pytest 1 passed. Driver re-ran gate independently. Secrets scan CLEAN on staged diff. uv installed via pip --user (was missing on machine); session-scoped PATH export used. |
 | 2 | 1 | claude | phase work | 73616 | 3 | PASS | VERIFY exit 0: test_models 26 passed, full suite 27 passed, ruff clean. Driver re-ran gate. Secrets scan CLEAN. |
+| 3 | 2 | claude | phase work | 72715 | 4 | PASS | VERIFY exit 0: test_llm 29 passed, full suite 56 passed, ruff clean. Driver re-ran gate. Secrets scan CLEAN. Cost-table prices flagged INFERRED by agent (cosmetic only). |
 
 ## Agent Activity Log
 
@@ -57,6 +58,7 @@ Rollup: total=137692 | phases=2 | median/phase=68846
 |---|---|---|---|
 | 18:35 | 0 | PASS | 6692f03 |
 | 18:40 | 1 | PASS | 6b676c9 |
+| 18:44 | 2 | PASS | 03edc05 |
 
 ## Phase Status
 
@@ -64,7 +66,7 @@ Rollup: total=137692 | phases=2 | median/phase=68846
 |---|---|---|---|---|---|
 | 0 | Plan §Phase 0 | - Scaffold (runner: fable) | OK Done | 6692f03 | claude |
 | 1 | Plan §Phase 1 | - Models (runner: fable) | OK Done | 6b676c9 | claude |
-| 2 | Plan §Phase 2 | - LLM layer (runner: fable) | ⬜ Pending | -- | -- |
+| 2 | Plan §Phase 2 | - LLM layer (runner: fable) | OK Done | 03edc05 | claude |
 | 3 | Plan §Phase 3 | - Sources (runner: fable) | ⬜ Pending | -- | -- |
 | 4 | Plan §Phase 4 | - Pipeline (runner: ESCALATE / critic-gate -- judgment-heavy) | ⬜ Pending | -- | -- |
 | 5 | Plan §Phase 5 | - API (runner: fable) | ⬜ Pending | -- | -- |
