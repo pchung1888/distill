@@ -4,15 +4,26 @@ import io
 from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
 from pypdf import PdfReader
 
 from distill.models import RawDocument
-from distill.sources.base import SourceError
+from distill.sources.base import SourceError, download_public_bytes
 
 
 class PDFSource:
-    """Read a PDF (local path or URL) and extract its text page by page."""
+    """Read a PDF (local path or URL) and extract its text page by page.
+
+    Local filesystem access is a capability switch, OFF by default: a ref that
+    reaches this adapter through the API is attacker-controlled, and treating
+    it as a local path would let a caller read any file on the server (path
+    traversal / local file disclosure). resolve_source() always returns
+    PDFSource(allow_local=False); only trusted call sites that construct the
+    adapter themselves (tests, CLI usage on the operator's own machine) should
+    pass allow_local=True.
+    """
+
+    def __init__(self, allow_local: bool = False) -> None:
+        self._allow_local = allow_local
 
     def fetch(self, ref: str) -> RawDocument:
         data = self._read_bytes(ref)
@@ -36,15 +47,18 @@ class PDFSource:
             meta={"page_count": len(reader.pages)},
         )
 
-    @staticmethod
-    def _read_bytes(ref: str) -> bytes:
+    def _read_bytes(self, ref: str) -> bytes:
         if ref.startswith(("http://", "https://")):
-            try:
-                response = httpx.get(ref, follow_redirects=True, timeout=30.0)
-                response.raise_for_status()
-            except httpx.HTTPError as exc:
-                raise SourceError(f"failed to download {ref!r}: {exc}") from exc
-            return response.content
+            # download_public_bytes applies the SSRF guard, redirect
+            # re-validation, and the size cap; SourceError propagates unchanged.
+            data, _encoding = download_public_bytes(ref)
+            return data
+        if not self._allow_local:
+            raise SourceError(
+                f"local file access is disabled for PDF refs (got {ref!r}); "
+                "only http(s) URLs are accepted. Construct PDFSource(allow_local=True) "
+                "from a trusted call site to read local paths."
+            )
         path = Path(ref)
         if not path.is_file():
             raise SourceError(f"PDF file not found: {ref!r}")

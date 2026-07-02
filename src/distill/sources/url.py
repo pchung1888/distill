@@ -8,11 +8,10 @@ import re
 from datetime import UTC, datetime
 from urllib.parse import urlparse
 
-import httpx
 import trafilatura
 
 from distill.models import RawDocument
-from distill.sources.base import SourceError
+from distill.sources.base import SourceError, download_public_bytes
 
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 
@@ -25,12 +24,13 @@ class URLSource:
         return self.parse_html(html, ref)
 
     def _download(self, ref: str) -> str:
+        # download_public_bytes applies the SSRF guard, redirect re-validation,
+        # and the size cap; SourceError propagates unchanged.
+        data, encoding = download_public_bytes(ref)
         try:
-            response = httpx.get(ref, follow_redirects=True, timeout=30.0)
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise SourceError(f"failed to download {ref!r}: {exc}") from exc
-        return response.text
+            return data.decode(encoding, errors="replace")
+        except LookupError:
+            return data.decode("utf-8", errors="replace")
 
     @staticmethod
     def parse_html(html: str, ref: str) -> RawDocument:
