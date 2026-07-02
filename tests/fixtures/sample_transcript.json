@@ -1,0 +1,14 @@
+[
+  {"text": "Welcome everyone to this short talk about vector databases.", "start": 0.0, "duration": 4.2},
+  {"text": "Today we will cover what embeddings are and why they matter.", "start": 4.2, "duration": 4.5},
+  {"text": "An embedding is a list of numbers that represents meaning.", "start": 8.7, "duration": 4.1},
+  {"text": "Similar pieces of text end up close together in that space.", "start": 12.8, "duration": 4.0},
+  {"text": "A vector database stores millions of these embeddings.", "start": 16.8, "duration": 3.9},
+  {"text": "The core operation is similarity search over the vectors.", "start": 20.7, "duration": 4.0},
+  {"text": "Exact search is too slow at scale, so we approximate.", "start": 24.7, "duration": 3.8},
+  {"text": "Approximate nearest neighbor indexes trade recall for speed.", "start": 28.5, "duration": 4.3},
+  {"text": "Popular index types include HNSW graphs and IVF lists.", "start": 32.8, "duration": 4.1},
+  {"text": "You tune parameters to balance latency against accuracy.", "start": 36.9, "duration": 3.9},
+  {"text": "Always measure recall on your own data before shipping.", "start": 40.8, "duration": 4.0},
+  {"text": "Thanks for watching, and see you in the next session.", "start": 44.8, "duration": 3.5}
+]
