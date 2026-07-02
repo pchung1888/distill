@@ -87,6 +87,7 @@ class KnowledgeDoc(BaseModel):
     topics: list[str]
     critic: CriticResult
     created_at: datetime
+    meta: dict[str, Any] = Field(default_factory=dict)
 
     def to_markdown(self) -> str:
         """Render as Markdown with YAML frontmatter (source, type, title,
