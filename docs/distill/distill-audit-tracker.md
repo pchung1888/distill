@@ -35,16 +35,16 @@ Full spec: docs/HANDOFF.md. This is Ping's public AI-engineering portfolio piece
 
 | Field | Value |
 |---|---|
-| Last completed phase | Phase 4 - (see Phase Status) |
-| Last successful commit | 9a592cd |
-| Next action | Dispatch phase 5 |
+| Last completed phase | Phase 5 - (see Phase Status) |
+| Last successful commit | 398a8f5 |
+| Next action | Dispatch phase 6 |
 | Pending follow-ups | <status> <owner> -- <next action> |
 
 Token budget rules: per user CLAUDE.md; log actuals in the Cost Log.
 
 ## Subagent Token Cost Log
 
-Rollup: total=1029514 | phases=5 | median/phase=73616
+Rollup: total=1123438 | phases=6 | median/phase=80429
 
 | # | Phase | Subagent type | Task description | Tokens | Duration | Outcome | Notes |
 |---|---|---|---|---|---|---|---|
@@ -53,6 +53,7 @@ Rollup: total=1029514 | phases=5 | median/phase=73616
 | 3 | 2 | claude | phase work | 72715 | 4 | PASS | VERIFY exit 0: test_llm 29 passed, full suite 56 passed, ruff clean. Driver re-ran gate. Secrets scan CLEAN. Cost-table prices flagged INFERRED by agent (cosmetic only). |
 | 4 | 3 | claude | phase work | 87243 | 5 | PASS | VERIFY exit 0: test_sources 18 passed, full suite 74 passed, ruff clean. Driver re-ran gate. Secrets scan CLEAN. youtube-transcript-api 1.x live path INFERRED (not network-tested by design). |
 | 5 | 4 | claude+5-seat-panel | phase work | 731864 | 75 | PASS | VERIFY exit 0: pipeline+critic 27 passed, full suite 127 passed, ruff clean. CRITIC GATE: 5-seat panel verdict FIX (3of5: ms-mario/vex/iris FIX, amanda/rhea PASS; codex stalled -> iris substituted). All 16 findings fixed in 9a592cd; ms-mario re-check PASS. Tally: .claude/tmp/critic-gate-phase4-tally-2026-07-02.md. Also security hardening commit 8c0ab94 (SSRF/size-cap/local-PDF). Token figure includes build agent 124K + panel 458K + fix agent 132K + recheck 51K. | WARNING: --tokens=731864 exceeds 500,000; double-check your count. |
+| 6 | 5 | claude | phase work | 93924 | 4 | PASS | VERIFY exit 0: test_api 8 passed, full suite 135 passed, ruff clean. Driver re-ran gate. Secrets scan CLEAN. Note: starlette TestClient deprecation warning re httpx2 (harmless). |
 
 ## Agent Activity Log
 
@@ -63,6 +64,7 @@ Rollup: total=1029514 | phases=5 | median/phase=73616
 | 18:44 | 2 | PASS | 03edc05 |
 | 18:50 | 3 | PASS | a08f4ec |
 | 20:12 | 4 | PASS | 9a592cd |
+| 20:18 | 5 | PASS | 398a8f5 |
 
 ## Phase Status
 
@@ -73,7 +75,7 @@ Rollup: total=1029514 | phases=5 | median/phase=73616
 | 2 | Plan §Phase 2 | - LLM layer (runner: fable) | OK Done | 03edc05 | claude |
 | 3 | Plan §Phase 3 | - Sources (runner: fable) | OK Done | a08f4ec | claude |
 | 4 | Plan §Phase 4 | - Pipeline (runner: ESCALATE / critic-gate -- judgment-heavy) | OK Done | 9a592cd | claude+5-seat-panel |
-| 5 | Plan §Phase 5 | - API (runner: fable) | ⬜ Pending | -- | -- |
+| 5 | Plan §Phase 5 | - API (runner: fable) | OK Done | 398a8f5 | claude |
 | 6 | Plan §Phase 6 | - Evals (runner: ESCALATE / critic-gate -- judgment-heavy) | ⬜ Pending | -- | -- |
 | 7 | Plan §Phase 7 | - Deploy + docs (HUMAN-GATED -- needs GCP creds) | ⬜ Pending | -- | -- |
 
