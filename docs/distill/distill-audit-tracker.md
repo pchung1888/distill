@@ -92,3 +92,20 @@ Rollup: total=1870854 | phases=8 | median/phase=89669
 ## Self-Improvement Capture
 
 Format: - YYYY-MM-DD [phase N] <lesson> (lesson-candidate: YES/NO)
+
+- 2026-07-02 [phase 0] Spec prereq `uv` was absent on the machine; pip --user
+  install worked but the Scripts dir is not on PATH and persistent PATH edits
+  are classifier-denied -- every uv invocation needs a session-scoped export.
+  (lesson-candidate: YES, tooling)
+- 2026-07-02 [phase 3] Raw-byte PDF fixtures must be marked `*.pdf binary` in
+  .gitattributes on Windows or a future CRLF checkout corrupts xref offsets.
+  (lesson-candidate: YES, tooling)
+- 2026-07-02 [phase 4] codex:codex-rescue Seat 5 can stall indefinitely
+  (42 min silent); after ~15 min of no output, substitute iris and record the
+  substitution -- do not block the build on a hung external CLI.
+  (lesson-candidate: YES, tooling)
+- 2026-07-02 [phase 4+6] The 5-seat gate consistently converges on
+  honesty-of-claims findings (docstring overstates behavior, metrics that
+  silently exclude spend) rather than logic bugs -- pre-empt by auditing every
+  docstring claim against code before dispatching the panel.
+  (lesson-candidate: YES, process)
