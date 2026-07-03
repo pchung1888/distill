@@ -1,0 +1,40 @@
+Transcript: "Scaling PostgreSQL at AcmeStream" -- a synthetic conference
+talk written for this eval set. The company, speaker, and numbers are
+fictional.
+
+[00:00] DANA RIVERA: Hi everyone, I'm Dana Rivera, a staff engineer at
+AcmeStream. Today I want to walk through how we scaled our PostgreSQL
+cluster from a single overloaded primary to a setup that comfortably
+serves our analytics product.
+
+[01:10] Two years ago we had one PostgreSQL primary holding about 12
+terabytes of data, and our p99 query latency on the events table was
+around 450 milliseconds. Dashboards timed out daily, and every schema
+migration was a white-knuckle event.
+
+[03:45] The first fix was the boring one: connection pooling. Our API
+servers were opening thousands of short-lived connections, and Postgres
+spends real memory per connection. We put PgBouncer in front of the
+database in transaction pooling mode, and connection count dropped from
+about 4,000 to under 200. That alone bought us months of headroom.
+
+[07:20] The second fix was read replicas. We added three streaming read
+replicas and routed all dashboard and reporting queries to them, keeping
+the primary for writes and transactional reads. Replication lag stays
+under two seconds for us, which is fine for analytics.
+
+[11:05] The third and biggest fix was declarative partitioning. We
+partitioned the events table by month, so queries that filter on a time
+range only scan the partitions they need, and dropping old data became a
+metadata operation instead of a week-long DELETE. After partitioning,
+p99 latency on the events table dropped from 450 milliseconds to about
+80 milliseconds.
+
+[15:30] A few lessons to take home. First, measure before you shard:
+we never actually needed to shard, and I think most teams reach for
+sharding too early. Second, boring tools like PgBouncer solve real
+problems. Third, partitioning pays off only if your queries actually
+filter on the partition key, so design that first.
+
+[17:00] That's the story: pooling, replicas, and partitioning took us
+from nightly pages to a system nobody thinks about. Thanks!

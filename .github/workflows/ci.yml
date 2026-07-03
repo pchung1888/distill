@@ -22,6 +22,5 @@ jobs:
       - name: Test
         run: uv run pytest -q
 
-      # Phase 6 will add a mock-provider eval run here:
-      # - name: Evals (mock provider)
-      #   run: uv run python evals/run_evals.py --provider mock
+      - name: Evals (mock provider)
+        run: uv run python evals/run_evals.py --provider mock

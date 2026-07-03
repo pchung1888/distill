@@ -1,0 +1,11 @@
+{
+  "key_facts": [
+    "pgbouncer",
+    "three streaming read replicas",
+    "partitioned the events table by month",
+    "450 milliseconds to about 80 milliseconds",
+    "measure before you shard"
+  ],
+  "min_key_points": 4,
+  "topics_any": ["postgresql", "databases", "scaling"]
+}

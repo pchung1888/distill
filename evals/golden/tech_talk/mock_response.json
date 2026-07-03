@@ -1,0 +1,26 @@
+{
+  "draft": {
+    "summary": "In this talk, Dana Rivera, a staff engineer at AcmeStream, explains how the team scaled a single overloaded PostgreSQL primary holding about 12 terabytes. They added PgBouncer in transaction pooling mode to cut connections from about 4,000 to under 200, routed analytics queries to three streaming read replicas, and partitioned the events table by month, which took p99 latency on that table from 450 milliseconds to about 80 milliseconds. The main lessons: measure before you shard, boring tools solve real problems, and partitioning only pays off if queries filter on the partition key.",
+    "key_points": [
+      "AcmeStream started with one PostgreSQL primary holding about 12 terabytes and p99 latency around 450 milliseconds on the events table.",
+      "Putting PgBouncer in front of the database in transaction pooling mode dropped connection count from about 4,000 to under 200.",
+      "Three streaming read replicas now serve dashboard and reporting queries, with replication lag under two seconds.",
+      "The team partitioned the events table by month, so time-range queries scan only the partitions they need and old data can be dropped as a metadata operation.",
+      "After partitioning, p99 latency on the events table dropped from 450 milliseconds to about 80 milliseconds.",
+      "Key lessons: measure before you shard, boring tools like PgBouncer solve real problems, and partitioning pays off only if queries filter on the partition key."
+    ],
+    "entities": [
+      {"name": "Dana Rivera", "type": "person", "mentions": 2},
+      {"name": "AcmeStream", "type": "organization", "mentions": 3},
+      {"name": "PostgreSQL", "type": "technology", "mentions": 4},
+      {"name": "PgBouncer", "type": "technology", "mentions": 3}
+    ],
+    "topics": ["postgresql", "database scaling", "performance"]
+  },
+  "critic": {
+    "confidence": 0.95,
+    "faithful": true,
+    "issues": [],
+    "missing_points": []
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "draft": {
+    "summary": "The water cycle, or hydrologic cycle, is the continuous movement of water on, above, and below the Earth's surface. Solar energy drives the water cycle: the sun heats surface water, causing evaporation, while plants add water vapor through transpiration. Rising moist air cools and condenses into clouds, falls as precipitation, soaks into the ground to recharge aquifers, or runs off into rivers that return it to the oceans, where about 97 percent of Earth's water is stored.",
+    "key_points": [
+      "Solar energy drives the water cycle by heating water in oceans, lakes, and rivers, causing evaporation.",
+      "Plants release water vapor into the atmosphere through transpiration.",
+      "Rising water vapor cools and condenses into clouds, then falls back to the surface as precipitation such as rain or snow.",
+      "Precipitation that soaks into the soil (infiltration) recharges groundwater aquifers, while surface runoff returns water to rivers and oceans.",
+      "About 97 percent of Earth's water is stored in the oceans as salt water, and less than one percent is readily available fresh water."
+    ],
+    "entities": [
+      {"name": "water cycle", "type": "concept", "mentions": 5},
+      {"name": "evaporation", "type": "process", "mentions": 2},
+      {"name": "transpiration", "type": "process", "mentions": 2},
+      {"name": "precipitation", "type": "process", "mentions": 4}
+    ],
+    "topics": ["water cycle", "hydrology", "earth science"]
+  },
+  "critic": {
+    "confidence": 0.92,
+    "faithful": true,
+    "issues": [],
+    "missing_points": []
+  },
+  "judge": {
+    "confidence": 0.90,
+    "faithful": true,
+    "issues": [],
+    "missing_points": ["Snowpack and glaciers can store frozen water for months or centuries."]
+  }
+}
