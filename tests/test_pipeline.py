@@ -63,11 +63,13 @@ def critic_json(
 
 
 class RecordingLLM:
-    """LLMPort wrapper capturing every prompt and response for assertions."""
+    """LLMPort wrapper capturing every prompt/system/temperature and response."""
 
     def __init__(self, inner: LLMPort) -> None:
         self.inner = inner
         self.prompts: list[str] = []
+        self.systems: list[str | None] = []
+        self.temperatures: list[float | None] = []
         self.responses: list[LLMResponse] = []
 
     def complete(
@@ -76,11 +78,39 @@ class RecordingLLM:
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:
         self.prompts.append(prompt)
-        response = self.inner.complete(prompt, system=system, json_schema=json_schema)
+        self.systems.append(system)
+        self.temperatures.append(temperature)
+        response = self.inner.complete(
+            prompt, system=system, json_schema=json_schema, temperature=temperature
+        )
         self.responses.append(response)
         return response
+
+
+class RaisingOnMarkerLLM:
+    """Delegates to MockProvider, but RAISES on prompts containing `marker`."""
+
+    def __init__(self, marker: str, exc: Exception) -> None:
+        self.inner = MockProvider()
+        self.marker = marker
+        self.exc = exc
+
+    def complete(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        json_schema: dict | None = None,
+        temperature: float | None = None,
+    ) -> LLMResponse:
+        if self.marker in prompt:
+            raise self.exc
+        return self.inner.complete(
+            prompt, system=system, json_schema=json_schema, temperature=temperature
+        )
 
 
 # ------------------------------------------------------------- happy path
@@ -121,7 +151,11 @@ class TestRepairLoop:
     def test_malformed_then_valid_fires_repair_exactly_once(self) -> None:
         provider = MockProvider(script=["{not valid json", draft_json(), critic_json()])
         kdoc, trace = Pipeline(provider).run(make_raw_doc())
-        assert [stage.name for stage in trace.stages] == ["extract", "repair", "critic"]
+        assert [stage.name for stage in trace.stages] == [
+            "extract",
+            "validate_repair",
+            "critic",
+        ]
         assert kdoc.summary == "A scripted summary."
 
     def test_malformed_then_still_malformed_raises_pipeline_error(self) -> None:
@@ -131,6 +165,17 @@ class TestRepairLoop:
         assert excinfo.value.stage == "validate"
         assert "validate" in str(excinfo.value)
         assert excinfo.value.cause is not None
+
+    def test_malformed_critic_then_valid_fires_critic_repair(self) -> None:
+        # e2e through Pipeline.run(): valid draft, malformed critic, valid critic.
+        provider = MockProvider(script=[draft_json(), "{not valid json", critic_json()])
+        kdoc, trace = Pipeline(provider).run(make_raw_doc())
+        assert [stage.name for stage in trace.stages] == [
+            "extract",
+            "critic",
+            "critic_repair",
+        ]
+        assert kdoc.critic.confidence == 0.95
 
     def test_fenced_json_parses_without_repair(self) -> None:
         fenced = "```json\n" + draft_json("Fenced summary.") + "\n```"
@@ -144,6 +189,93 @@ class TestRepairLoop:
         provider = MockProvider(script=[wrapped, critic_json()])
         _kdoc, trace = Pipeline(provider).run(make_raw_doc())
         assert [stage.name for stage in trace.stages] == ["extract", "critic"]
+
+    def test_stray_brace_placeholder_before_json_parses_without_repair(self) -> None:
+        wrapped = (
+            "Filling the {placeholder} template as requested:\n"
+            + draft_json("Stray-brace summary.")
+        )
+        provider = MockProvider(script=[wrapped, critic_json()])
+        kdoc, trace = Pipeline(provider).run(make_raw_doc())
+        assert [stage.name for stage in trace.stages] == ["extract", "critic"]
+        assert kdoc.summary == "Stray-brace summary."
+
+    def test_trailing_stray_brace_after_json_parses_without_repair(self) -> None:
+        wrapped = draft_json("Trailing-brace summary.") + "\nThat closes it. }"
+        provider = MockProvider(script=[wrapped, critic_json()])
+        kdoc, trace = Pipeline(provider).run(make_raw_doc())
+        assert [stage.name for stage in trace.stages] == ["extract", "critic"]
+        assert kdoc.summary == "Trailing-brace summary."
+
+
+# ---------------------------------------------------------- failure metering
+
+
+class TestPartialTrace:
+    def test_repair_exhaustion_error_carries_partial_trace(self) -> None:
+        provider = MockProvider(script=["{bad", "{still bad"])
+        with pytest.raises(PipelineError) as excinfo:
+            Pipeline(provider).run(make_raw_doc())
+        partial = excinfo.value.partial_trace
+        assert partial is not None
+        assert [stage.name for stage in partial.stages] == ["extract", "validate_repair"]
+        assert all(stage.tokens_in > 0 for stage in partial.stages)
+        assert all(stage.tokens_out > 0 for stage in partial.stages)
+
+    def test_critic_repair_exhaustion_error_carries_partial_trace(self) -> None:
+        provider = MockProvider(script=[draft_json(), "not json", "still not json"])
+        with pytest.raises(PipelineError) as excinfo:
+            Pipeline(provider).run(make_raw_doc())
+        assert excinfo.value.stage == "critic"
+        partial = excinfo.value.partial_trace
+        assert partial is not None
+        assert [stage.name for stage in partial.stages] == [
+            "extract",
+            "critic",
+            "critic_repair",
+        ]
+
+    def test_raising_provider_is_wrapped_and_metered(self) -> None:
+        llm = RaisingOnMarkerLLM("TASK: CRITIC", RuntimeError("provider down"))
+        with pytest.raises(PipelineError) as excinfo:
+            Pipeline(llm).run(make_raw_doc())
+        err = excinfo.value
+        assert err.stage == "critic"
+        assert isinstance(err.cause, RuntimeError)
+        partial = err.partial_trace
+        assert partial is not None
+        assert [stage.name for stage in partial.stages] == ["extract", "critic"]
+        # The successful extract call kept its real meters...
+        assert partial.stages[0].tokens_in > 0
+        # ...and the failed critic attempt is recorded as a zero-token entry.
+        assert partial.stages[1].tokens_in == 0
+        assert partial.stages[1].tokens_out == 0
+        assert partial.stages[1].cost_usd == 0.0
+
+
+# ---------------------------------------------------- prompts and provenance
+
+
+class TestPromptsAndProvenance:
+    def test_pipeline_pins_temperature_zero_and_sets_system(self) -> None:
+        script = ["{not valid json", draft_json(), critic_json()]
+        recording = RecordingLLM(MockProvider(script=script))
+        Pipeline(recording).run(make_raw_doc())
+        # extract + repair + critic all pin temperature=0.0.
+        assert recording.temperatures == [0.0, 0.0, 0.0]
+        # Role/persona text travels in system=, not in the user prompt.
+        assert "knowledge extractor" in (recording.systems[0] or "")
+        assert "repair" in (recording.systems[1] or "")
+        assert "faithfulness critic" in (recording.systems[2] or "")
+        for prompt in recording.prompts:
+            assert "You are a" not in prompt
+
+    def test_source_meta_and_fetched_at_survive_to_knowledge_doc(self) -> None:
+        doc = make_raw_doc()
+        doc.meta = {"page_count": 12, "domain": "example.com"}
+        kdoc, _trace = Pipeline(MockProvider()).run(doc)
+        assert kdoc.fetched_at == FETCHED_AT
+        assert kdoc.meta["source_meta"] == {"page_count": 12, "domain": "example.com"}
 
 
 # -------------------------------------------------------------- truncation

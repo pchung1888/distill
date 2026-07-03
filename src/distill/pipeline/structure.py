@@ -15,9 +15,14 @@ def build_doc(
 ) -> KnowledgeDoc:
     """Combine source fields, validated draft content, and the critic verdict.
 
-    `meta` carries pipeline provenance -- e.g. the first critic verdict when
-    a low-confidence retry replaced it.
+    `meta` carries pipeline provenance -- e.g. superseded critic verdicts
+    when a low-confidence retry replaced them. Source provenance also
+    survives: `fetched_at` is copied from the RawDocument, and any adapter
+    meta (page_count, domain, ...) is preserved under meta["source_meta"].
     """
+    merged: dict[str, Any] = dict(meta) if meta else {}
+    if doc.meta:
+        merged["source_meta"] = dict(doc.meta)
     return KnowledgeDoc(
         source_type=doc.source_type,
         source_ref=doc.source_ref,
@@ -28,5 +33,6 @@ def build_doc(
         topics=draft.topics,
         critic=critic,
         created_at=datetime.now(UTC),
-        meta=dict(meta) if meta else {},
+        fetched_at=doc.fetched_at,
+        meta=merged,
     )

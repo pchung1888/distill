@@ -45,14 +45,18 @@ class Entity(BaseModel):
 class KnowledgeDraft(BaseModel):
     """The Extract stage's structured output; the Validate stage enforces this
     schema (its JSON schema via model_json_schema() feeds the extract prompt).
+
+    Cardinality constraints mirror the extract prompt's stated rules
+    (3-10 key points, 1-5 topics, non-empty summary), so a draft that
+    violates the prompt contract fails validation instead of slipping through.
     """
 
     model_config = ConfigDict(extra="ignore")
 
-    summary: str
-    key_points: list[str]
+    summary: str = Field(min_length=1)
+    key_points: list[str] = Field(min_length=3, max_length=10)
     entities: list[Entity]
-    topics: list[str]
+    topics: list[str] = Field(min_length=1, max_length=5)
 
 
 class CriticResult(BaseModel):
@@ -87,18 +91,23 @@ class KnowledgeDoc(BaseModel):
     topics: list[str]
     critic: CriticResult
     created_at: datetime
+    fetched_at: datetime | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
     def to_markdown(self) -> str:
         """Render as Markdown with YAML frontmatter (source, type, title,
         topics, confidence, created) followed by a readable body.
+
+        An empty-string title is normalized to None, so the frontmatter
+        (title: null) and the body heading (source_ref fallback) agree.
         """
+        title = self.title or None
         topics = "[" + ", ".join(_yaml_str(t) for t in self.topics) + "]"
         lines = [
             "---",
             f"source: {_yaml_str(self.source_ref)}",
             f"type: {self.source_type}",
-            f"title: {_yaml_str(self.title)}",
+            f"title: {_yaml_str(title)}",
             f"topics: {topics}",
             f"confidence: {self.critic.confidence}",
             f"created: {self.created_at.isoformat()}",

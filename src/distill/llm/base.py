@@ -21,7 +21,11 @@ class LLMResponse(BaseModel):
 
 @runtime_checkable
 class LLMPort(Protocol):
-    """The single method every provider must implement."""
+    """The single method every provider must implement.
+
+    `temperature=None` means provider default; the pipeline pins 0.0 for
+    its extract / repair / critic calls (deterministic-by-default).
+    """
 
     def complete(
         self,
@@ -29,6 +33,7 @@ class LLMPort(Protocol):
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse: ...
 
 

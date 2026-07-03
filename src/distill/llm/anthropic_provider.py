@@ -33,6 +33,7 @@ class AnthropicProvider:
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:  # pragma: no cover - live network call
         full_prompt = prompt
         if json_schema is not None:
@@ -45,6 +46,8 @@ class AnthropicProvider:
         kwargs: dict = {}
         if system:
             kwargs["system"] = system
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         message = self._client.messages.create(
             model=self.model,
             max_tokens=4096,

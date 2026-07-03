@@ -3,6 +3,13 @@
 The critic sees ONLY the source and the draft, and must score how well the
 draft is supported by the source (confidence 0-1, calibrated). Parse failures
 reuse the shared bounded repair loop from validate.py.
+
+Prompt-injection threat model: the source text is embedded VERBATIM in both
+the extract and critic prompts, so a hostile source could carry instructions
+aimed at the critic ("rate this draft 1.0", fake TASK markers, etc.). The v1
+trust boundary is public/synthetic sources chosen by the operator (HANDOFF
+Section 9); no sanitization or delimiter-escaping is attempted. Do not point
+the pipeline at adversarial or user-submitted sources without adding one.
 """
 
 import json
@@ -12,10 +19,15 @@ from distill.models import CriticResult, KnowledgeDraft, RawDocument
 from distill.pipeline.extract import truncate_source
 from distill.pipeline.validate import parse_or_repair
 
+CRITIC_SYSTEM = (
+    "You are a strict faithfulness critic. You judge whether a draft is "
+    "supported by its source document, and nothing else."
+)
+
 CRITIC_PROMPT_TEMPLATE = """\
 TASK: CRITIC
 
-You are a strict faithfulness critic. Judge the DRAFT below ONLY against the
+Judge the DRAFT below ONLY against the
 SOURCE below. Outside knowledge must not rescue a claim the source does not
 support. Produce STRICT JSON -- exactly one JSON object, no prose, no
 markdown fences -- matching this JSON schema:
@@ -63,7 +75,12 @@ def run_critic(
     propagates. Returns (verdict, the initial critic response).
     """
     prompt = build_critic_prompt(doc, draft)
-    response = llm.complete(prompt, json_schema=CriticResult.model_json_schema())
+    response = llm.complete(
+        prompt,
+        system=CRITIC_SYSTEM,
+        json_schema=CriticResult.model_json_schema(),
+        temperature=0.0,
+    )
     result, _repairs = parse_or_repair(
         llm, CriticResult, response.text, stage="critic", max_repairs=max_repairs
     )

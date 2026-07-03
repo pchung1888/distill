@@ -35,12 +35,15 @@ class GeminiProvider:
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:  # pragma: no cover - live network call
         from google.genai import types
 
         config_kwargs: dict = {}
         if system:
             config_kwargs["system_instruction"] = system
+        if temperature is not None:
+            config_kwargs["temperature"] = temperature
         if json_schema is not None:
             config_kwargs["response_mime_type"] = "application/json"
             config_kwargs["response_json_schema"] = json_schema

@@ -146,7 +146,7 @@ def test_entity_rejects_missing_name() -> None:
 def test_knowledge_draft_valid_parse() -> None:
     draft = KnowledgeDraft(
         summary="A summary.",
-        key_points=["p1", "p2"],
+        key_points=["p1", "p2", "p3"],
         entities=[Entity(name="Bob", type="person")],
         topics=["topic-a"],
     )
@@ -156,7 +156,35 @@ def test_knowledge_draft_valid_parse() -> None:
 
 def test_knowledge_draft_rejects_missing_summary() -> None:
     with pytest.raises(ValidationError):
-        KnowledgeDraft(key_points=[], entities=[], topics=[])
+        KnowledgeDraft(key_points=["p1", "p2", "p3"], entities=[], topics=["t"])
+
+
+def test_knowledge_draft_rejects_too_few_key_points() -> None:
+    # The extract prompt demands 3-10 key points; the schema enforces it.
+    with pytest.raises(ValidationError):
+        KnowledgeDraft(
+            summary="A summary.",
+            key_points=["p1", "p2"],
+            entities=[],
+            topics=["topic-a"],
+        )
+
+
+def test_knowledge_draft_rejects_empty_topics_and_empty_summary() -> None:
+    with pytest.raises(ValidationError):
+        KnowledgeDraft(
+            summary="A summary.",
+            key_points=["p1", "p2", "p3"],
+            entities=[],
+            topics=[],
+        )
+    with pytest.raises(ValidationError):
+        KnowledgeDraft(
+            summary="",
+            key_points=["p1", "p2", "p3"],
+            entities=[],
+            topics=["topic-a"],
+        )
 
 
 def test_knowledge_draft_json_schema_is_generated() -> None:
@@ -234,7 +262,19 @@ def test_knowledge_doc_to_markdown_frontmatter() -> None:
 def test_knowledge_doc_to_markdown_handles_none_title() -> None:
     md = make_doc(title=None).to_markdown()
     assert md.startswith("---")
-    assert "title:" in md
+    assert "title: null" in md
+    assert "# https://example.com/article" in md
+
+
+def test_knowledge_doc_to_markdown_empty_title_matches_none() -> None:
+    # An empty-string title renders exactly like a None title.
+    assert make_doc(title="").to_markdown() == make_doc(title=None).to_markdown()
+
+
+def test_knowledge_doc_fetched_at_optional_default_none() -> None:
+    assert make_doc().fetched_at is None
+    doc = make_doc(fetched_at=FETCHED_AT)
+    assert doc.fetched_at == FETCHED_AT
 
 
 def test_knowledge_doc_json_round_trip() -> None:

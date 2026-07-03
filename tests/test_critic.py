@@ -75,10 +75,11 @@ class TestLowConfidenceRetry:
         # The SECOND critic verdict is the one attached to the doc.
         assert kdoc.critic.confidence == 0.9
         assert kdoc.summary == "Second attempt summary."
-        # The first verdict is preserved as provenance in meta.
+        # The superseded verdict is preserved as provenance in meta.
         assert kdoc.meta["critic_retries"] == 1
-        assert kdoc.meta["first_critic"]["confidence"] == 0.4
-        assert kdoc.meta["first_critic"]["faithful"] is False
+        assert len(kdoc.meta["prior_critics"]) == 1
+        assert kdoc.meta["prior_critics"][0]["confidence"] == 0.4
+        assert kdoc.meta["prior_critics"][0]["faithful"] is False
 
     def test_retry_prompt_carries_critic_feedback(self) -> None:
         script = [
@@ -110,7 +111,26 @@ class TestLowConfidenceRetry:
         assert len(trace.stages) == 4
         assert kdoc.critic.confidence == 0.35
         assert kdoc.critic.faithful is False
-        assert kdoc.meta["first_critic"]["confidence"] == 0.3
+        assert kdoc.meta["prior_critics"][0]["confidence"] == 0.3
+
+    def test_two_retries_preserve_all_prior_verdicts_in_order(self) -> None:
+        script = [
+            draft_json("First attempt summary."),
+            critic_json(0.3, faithful=False, issues=LOW_ISSUES),
+            draft_json("Second attempt summary."),
+            critic_json(0.45, faithful=False, issues=LOW_ISSUES),
+            draft_json("Third attempt summary."),
+            critic_json(0.9),
+        ]
+        pipeline = Pipeline(MockProvider(script=script), max_critic_retries=2)
+        kdoc, trace = pipeline.run(make_raw_doc())
+
+        assert len(trace.stages) == 6
+        assert kdoc.critic.confidence == 0.9
+        assert kdoc.summary == "Third attempt summary."
+        assert kdoc.meta["critic_retries"] == 2
+        priors = kdoc.meta["prior_critics"]
+        assert [verdict["confidence"] for verdict in priors] == [0.3, 0.45]
 
     def test_confidence_equal_to_threshold_does_not_retry(self) -> None:
         script = [draft_json(), critic_json(0.7)]

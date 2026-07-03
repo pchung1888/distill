@@ -28,6 +28,7 @@ class OllamaProvider:
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:  # pragma: no cover - needs a live Ollama server
         import httpx
 
@@ -38,6 +39,8 @@ class OllamaProvider:
         }
         if system:
             payload["system"] = system
+        if temperature is not None:
+            payload["options"] = {"temperature": temperature}
         if json_schema is not None:
             full_schema_prompt = (
                 f"{prompt}\n\nRespond ONLY with JSON matching this JSON schema:\n"

@@ -1,6 +1,13 @@
 """OpenAIProvider -- optional live provider via the openai SDK.
 
 Lazy SDK import (optional extra `distill[openai]`); not exercised by tests.
+
+Known limitation: structured-output STRICT mode is NOT enabled. Pydantic's
+default model_json_schema() output lacks `additionalProperties: false` and
+does not list every property as required, both of which OpenAI's
+`strict: true` json_schema mode demands. The schema is therefore passed
+without `strict`, so json_schema conformance is best-effort -- pending
+live-API verification of a strict-compatible schema transform.
 """
 
 import os
@@ -30,12 +37,15 @@ class OpenAIProvider:
         *,
         system: str | None = None,
         json_schema: dict | None = None,
+        temperature: float | None = None,
     ) -> LLMResponse:  # pragma: no cover - live network call
         messages: list[dict] = []
         if system:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         kwargs: dict = {}
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         if json_schema is not None:
             kwargs["response_format"] = {
                 "type": "json_schema",

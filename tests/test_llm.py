@@ -54,6 +54,26 @@ class TestMockProviderCannedResponses:
         response = provider.complete("prompt containing MAGIC token")
         assert response.text == "overridden"
 
+    def test_earliest_marker_wins_over_embedded_marker(self) -> None:
+        # A critic prompt whose embedded SOURCE text happens to contain the
+        # extract marker must still resolve as a critic prompt, because the
+        # template's own "TASK: CRITIC" appears earlier in the prompt.
+        prompt = (
+            "TASK: CRITIC\n\nJudge the draft.\n\nSOURCE:\n"
+            "An article explaining what TASK: EXTRACT means in this pipeline.\n\n"
+            "DRAFT (JSON):\n{}"
+        )
+        response = MockProvider().complete(prompt)
+        result = CriticResult.model_validate_json(response.text)
+        assert result.faithful is True
+
+    def test_repair_marker_returns_default_not_canned_draft(self) -> None:
+        # A repair prompt embedding invalid output that contains an extract
+        # marker must NOT be rescued by the canned draft.
+        prompt = "TASK: REPAIR\n\nThe invalid response was:\n\nTASK: EXTRACT {bad"
+        response = MockProvider().complete(prompt)
+        assert response.text == MockProvider.DEFAULT_RESPONSE
+
 
 class TestMockProviderScript:
     def test_script_queue_returns_responses_in_order(self) -> None:
@@ -94,6 +114,12 @@ class TestLLMResponseFields:
         bare = provider.complete("same prompt")
         with_system = provider.complete("same prompt", system="You are a careful extractor." * 5)
         assert with_system.tokens_in > bare.tokens_in
+
+    def test_temperature_is_accepted_and_ignored(self) -> None:
+        provider = MockProvider()
+        assert provider.complete("same prompt", temperature=0.0) == provider.complete(
+            "same prompt"
+        )
 
 
 class TestCostTable:
