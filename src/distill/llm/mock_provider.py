@@ -1,9 +1,10 @@
 """MockProvider -- deterministic canned responses for tests/CI.
 
-No network, no cost, no randomness, no time dependence. Pipeline stages embed
-marker substrings ("TASK: EXTRACT", "TASK: CRITIC", "TASK: REPAIR") in their
-prompts; this provider keys canned JSON off those markers so the full pipeline
-runs offline.
+No network, no cost, no randomness, no time dependence. Pipeline stages and
+the eval judge embed marker substrings ("TASK: EXTRACT", "TASK: CRITIC",
+"TASK: JUDGE", "TASK: REPAIR") in their prompts; this provider keys canned
+JSON off those markers so the full pipeline (and the eval harness's judge
+call) runs offline.
 """
 
 import json
@@ -12,6 +13,7 @@ from distill.llm.base import LLMResponse
 
 EXTRACT_MARKER = "TASK: EXTRACT"
 CRITIC_MARKER = "TASK: CRITIC"
+JUDGE_MARKER = "TASK: JUDGE"
 REPAIR_MARKER = "TASK: REPAIR"
 
 # Canned KnowledgeDraft JSON (matches distill.models.KnowledgeDraft).
@@ -41,6 +43,11 @@ _CANNED_CRITIC = json.dumps(
     }
 )
 
+# Canned judge verdict for the eval harness's "TASK: JUDGE" prompt. Same
+# CriticResult shape as the critic verdict, keyed off its own marker so the
+# judge prompt resolves independently of the pipeline critic prompt.
+_CANNED_JUDGE = _CANNED_CRITIC
+
 
 class MockProvider:
     """Deterministic LLMPort implementation for tests and CI.
@@ -54,7 +61,8 @@ class MockProvider:
        prompt whose embedded source text contains "TASK: EXTRACT" still
        resolves as critic, because the template's own marker comes first):
        EXTRACT -> canned KnowledgeDraft JSON, CRITIC -> canned CriticResult
-       JSON, REPAIR -> DEFAULT_RESPONSE (repairs must be scripted).
+       JSON, JUDGE -> canned CriticResult-shaped judge JSON, REPAIR ->
+       DEFAULT_RESPONSE (repairs must be scripted).
     4. DEFAULT_RESPONSE fixed echo string.
 
     `temperature` is accepted for LLMPort conformance and ignored -- the
@@ -100,6 +108,7 @@ class MockProvider:
             for marker, canned in (
                 (EXTRACT_MARKER, _CANNED_DRAFT),
                 (CRITIC_MARKER, _CANNED_CRITIC),
+                (JUDGE_MARKER, _CANNED_JUDGE),
                 (REPAIR_MARKER, self.DEFAULT_RESPONSE),
             )
             if marker in prompt

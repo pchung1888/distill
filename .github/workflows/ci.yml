@@ -22,5 +22,7 @@ jobs:
       - name: Test
         run: uv run pytest -q
 
-      - name: Evals (mock provider)
+      # Mock-mode evals gate harness+rubric MECHANICS (deterministic, offline);
+      # they do not measure real extraction quality -- live-provider runs do.
+      - name: Evals (mock provider -- harness mechanics gate)
         run: uv run python evals/run_evals.py --provider mock

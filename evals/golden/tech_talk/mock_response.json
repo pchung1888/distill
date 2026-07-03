@@ -22,5 +22,11 @@
     "faithful": true,
     "issues": [],
     "missing_points": []
+  },
+  "judge": {
+    "confidence": 0.93,
+    "faithful": true,
+    "issues": [],
+    "missing_points": []
   }
 }
