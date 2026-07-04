@@ -21,9 +21,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 import distill
-from distill.api.app import create_app, get_fetcher, get_pipeline
+from distill.api.app import create_app, get_fetcher, get_limiter, get_pipeline, get_pipeline_factory
+from distill.api.ratelimit import VISITOR_COOKIE, RateLimitConfig, RateLimiter
 from distill.config import Config
-from distill.models import IngestTrace, RawDocument, StageTrace
+from distill.models import CriticResult, IngestTrace, KnowledgeDoc, RawDocument, StageTrace
 from distill.pipeline import PipelineError
 from distill.sources.base import SourceError
 
@@ -41,6 +42,16 @@ def make_raw_doc() -> RawDocument:
         text="An article about Mock Corp and Jane Example.",
         fetched_at=FETCHED_AT,
     )
+
+
+def _stub_fetch(source_type: str, value: str) -> RawDocument:
+    """Shared get_fetcher override body: ignores its args, returns the fixture doc."""
+    return make_raw_doc()
+
+
+def _tagged_factory(name: str) -> "_TaggedPipeline":
+    """Shared get_pipeline_factory override body: tags output with the provider name."""
+    return _TaggedPipeline(name)
 
 
 @pytest.fixture()
@@ -212,3 +223,213 @@ class TestIngestPipelineError:
         # The detail must be JSON-serializable end to end (already proven by
         # response.json(), but assert the round trip explicitly).
         assert json.dumps(detail)
+
+
+# --------------------------------------------------------------- public demo
+
+
+def _tagged_pipeline_run(tag: str, doc: RawDocument) -> tuple[KnowledgeDoc, IngestTrace]:
+    knowledge_doc = KnowledgeDoc(
+        source_type=doc.source_type,
+        source_ref=doc.source_ref,
+        title=tag,
+        summary=f"summary from {tag}",
+        key_points=["a", "b", "c"],
+        entities=[],
+        topics=["t"],
+        critic=CriticResult(confidence=0.9, faithful=True, issues=[], missing_points=[]),
+        created_at=FETCHED_AT,
+    )
+    trace = IngestTrace(
+        stages=[
+            StageTrace(name="extract", tokens_in=10, tokens_out=5, cost_usd=0.001, latency_ms=1)
+        ]
+    )
+    return knowledge_doc, trace
+
+
+class _TaggedPipeline:
+    """Stub pipeline that tags its output with a name -- lets a test prove
+    WHICH provider path the route took without needing real provider creds."""
+
+    def __init__(self, tag: str) -> None:
+        self._tag = tag
+
+    def run(self, doc: RawDocument) -> tuple[KnowledgeDoc, IngestTrace]:
+        return _tagged_pipeline_run(self._tag, doc)
+
+
+class _RaisingNamedPipeline:
+    def __init__(self, error: PipelineError) -> None:
+        self._error = error
+
+    def run(self, doc: RawDocument) -> tuple:
+        raise self._error
+
+
+class TestCORS:
+    def test_allowed_origin_gets_cors_header(self) -> None:
+        app = create_app(Config(provider="mock", allowed_origins=["http://localhost:3000"]))
+        response = TestClient(app).get(
+            "/health", headers={"Origin": "http://localhost:3000"}
+        )
+        assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+    def test_disallowed_origin_gets_no_cors_header(self) -> None:
+        app = create_app(Config(provider="mock", allowed_origins=["http://localhost:3000"]))
+        response = TestClient(app).get(
+            "/health", headers={"Origin": "http://evil.example.com"}
+        )
+        assert "access-control-allow-origin" not in response.headers
+
+
+class TestVisitorCookie:
+    def test_first_ingest_sets_visitor_cookie(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        client = TestClient(app)
+        response = client.post(
+            "/ingest", json={"source_type": "url", "value": "https://example.com/article"}
+        )
+        assert response.status_code == 200
+        assert VISITOR_COOKIE in response.cookies
+
+    def test_visitor_cookie_is_reused_across_requests(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        client = TestClient(app)
+        client.post("/ingest", json={"source_type": "url", "value": "https://example.com/article"})
+        first_visitor = client.cookies.get(VISITOR_COOKIE)
+        client.post("/ingest", json={"source_type": "url", "value": "https://example.com/article"})
+        second_visitor = client.cookies.get(VISITOR_COOKIE)
+        assert first_visitor == second_visitor
+
+
+class TestProviderOverride:
+    def test_ingest_without_provider_uses_default_pipeline(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        app.dependency_overrides[get_pipeline] = lambda: _TaggedPipeline("default")
+        app.dependency_overrides[get_pipeline_factory] = lambda: (
+            lambda name: (_ for _ in ()).throw(AssertionError("factory should not be called"))
+        )
+        response = TestClient(app).post(
+            "/ingest", json={"source_type": "url", "value": "https://example.com/article"}
+        )
+        assert response.status_code == 200
+        assert response.json()["doc"]["title"] == "default"
+
+    def test_ingest_with_provider_uses_factory(self) -> None:
+        # NOTE: FastAPI resolves get_pipeline (the default) on every request
+        # regardless of body.provider -- see its docstring's KNOWN TRADEOFF.
+        # This test proves the FACTORY's output wins when a provider is
+        # given; it does not (and per that tradeoff, cannot) assert the
+        # default branch was skipped.
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        app.dependency_overrides[get_pipeline] = lambda: _TaggedPipeline("default")
+        app.dependency_overrides[get_pipeline_factory] = lambda: _tagged_factory
+        response = TestClient(app).post(
+            "/ingest",
+            json={
+                "source_type": "url",
+                "value": "https://example.com/article",
+                "provider": "gemini",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["doc"]["title"] == "gemini"
+
+
+class TestCompare:
+    def test_compare_runs_each_provider_and_tags_results(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        app.dependency_overrides[get_pipeline_factory] = lambda: _tagged_factory
+        response = TestClient(app).post(
+            "/compare",
+            json={
+                "source_type": "url",
+                "value": "https://example.com/article",
+                "providers": ["gemini", "openai"],
+            },
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert [r["provider"] for r in results] == ["gemini", "openai"]
+        assert results[0]["doc"]["title"] == "gemini"
+        assert results[1]["doc"]["title"] == "openai"
+        assert results[0]["error"] is None
+
+    def test_compare_isolates_a_failing_provider(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+
+        def factory(name: str):
+            if name == "broken":
+                error = PipelineError("critic", cause=RuntimeError("provider down"))
+                return _RaisingNamedPipeline(error)
+            return _TaggedPipeline(name)
+
+        app.dependency_overrides[get_pipeline_factory] = lambda: factory
+        response = TestClient(app).post(
+            "/compare",
+            json={
+                "source_type": "url",
+                "value": "https://example.com/article",
+                "providers": ["broken", "gemini"],
+            },
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert results[0]["provider"] == "broken"
+        assert results[0]["doc"] is None
+        assert "provider down" in results[0]["error"]
+        assert results[1]["doc"]["title"] == "gemini"
+
+
+class TestRateLimiting:
+    def test_single_run_429_after_daily_cap(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        # Build ONE limiter and capture it by closure -- a lambda that builds
+        # a fresh RateLimiter per call would reset the in-memory db every
+        # request, defeating the test (caught by this test failing first try).
+        limiter = RateLimiter(db_path=":memory:", config=RateLimitConfig(daily_single_runs=1))
+        app.dependency_overrides[get_limiter] = lambda: limiter
+        client = TestClient(app)
+        first = client.post("/ingest", json={"source_type": "url", "value": "https://example.com/article"})
+        assert first.status_code == 200
+        second = client.post("/ingest", json={"source_type": "url", "value": "https://example.com/article"})
+        assert second.status_code == 429
+        assert second.json()["detail"]["kind"] == "visitor_single"
+
+    def test_compare_429_after_daily_cap(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        app.dependency_overrides[get_pipeline_factory] = lambda: _tagged_factory
+        limiter = RateLimiter(db_path=":memory:", config=RateLimitConfig(daily_compares=1))
+        app.dependency_overrides[get_limiter] = lambda: limiter
+        client = TestClient(app)
+        body = {
+            "source_type": "url",
+            "value": "https://example.com/article",
+            "providers": ["gemini"],
+        }
+        first = client.post("/compare", json=body)
+        assert first.status_code == 200
+        second = client.post("/compare", json=body)
+        assert second.status_code == 429
+        assert second.json()["detail"]["kind"] == "visitor_compare"
+
+    def test_global_budget_429_once_prior_spend_hits_cap(self) -> None:
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+        rl_config = RateLimitConfig(daily_single_runs=10, global_daily_budget_usd=0.05)
+        limiter = RateLimiter(db_path=":memory:", config=rl_config)
+        limiter.record_spend(0.05)  # simulate today's budget already spent by other visitors
+        app.dependency_overrides[get_limiter] = lambda: limiter
+        client = TestClient(app)
+        response = client.post("/ingest", json={"source_type": "url", "value": "https://example.com/article"})
+        assert response.status_code == 429
+        assert response.json()["detail"]["kind"] == "global_budget"
