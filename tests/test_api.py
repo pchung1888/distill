@@ -340,6 +340,31 @@ class TestProviderOverride:
         assert response.status_code == 200
         assert response.json()["doc"]["title"] == "gemini"
 
+    def test_ingest_unavailable_provider_is_422_not_500(self) -> None:
+        """Reproduces a real bug found while building the distill-demo frontend:
+        pipeline_factory(body.provider) ran OUTSIDE any try/except, so an
+        unconfigured/SDK-missing provider (e.g. an optional extra not
+        installed) raised ImportError/ValueError uncaught -> an unhandled 500
+        with no CORS headers, which a browser reports as a bare network
+        failure instead of a real error body."""
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+
+        def factory(name: str):
+            raise ImportError(f"the {name} extra is not installed")
+
+        app.dependency_overrides[get_pipeline_factory] = lambda: factory
+        response = TestClient(app).post(
+            "/ingest",
+            json={
+                "source_type": "url",
+                "value": "https://example.com/article",
+                "provider": "gemini",
+            },
+        )
+        assert response.status_code == 422
+        assert "gemini" in response.json()["detail"]
+
 
 class TestCompare:
     def test_compare_runs_each_provider_and_tags_results(self) -> None:
@@ -386,6 +411,36 @@ class TestCompare:
         assert results[0]["doc"] is None
         assert "provider down" in results[0]["error"]
         assert results[1]["doc"]["title"] == "gemini"
+
+    def test_compare_isolates_a_provider_construction_failure(self) -> None:
+        """Same real bug as test_ingest_unavailable_provider_is_422_not_500,
+        but for /compare: pipeline_factory(name) ran OUTSIDE the per-provider
+        try/except, so ONE unconfigured provider crashed the WHOLE compare
+        call (and every other provider's result with it) instead of being
+        isolated like a PipelineError already was."""
+        app = create_app(Config(provider="mock"))
+        app.dependency_overrides[get_fetcher] = lambda: _stub_fetch
+
+        def factory(name: str):
+            if name == "openai":
+                raise ImportError("the openai extra is not installed")
+            return _TaggedPipeline(name)
+
+        app.dependency_overrides[get_pipeline_factory] = lambda: factory
+        response = TestClient(app).post(
+            "/compare",
+            json={
+                "source_type": "url",
+                "value": "https://example.com/article",
+                "providers": ["gemini", "openai"],
+            },
+        )
+        assert response.status_code == 200
+        results = response.json()["results"]
+        assert results[0]["doc"]["title"] == "gemini"
+        assert results[1]["provider"] == "openai"
+        assert results[1]["doc"] is None
+        assert "openai" in results[1]["error"]
 
 
 class TestRateLimiting:

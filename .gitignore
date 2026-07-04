@@ -12,3 +12,4 @@ dist/
 build/
 
 # NOTE: uv.lock is intentionally NOT ignored -- commit the lockfile.
+.gstack/

@@ -251,7 +251,16 @@ def create_app(config: Config | None = None) -> FastAPI:
             raw_doc = fetch(body.source_type, body.value)
         except SourceError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        pipeline = pipeline_factory(body.provider) if body.provider else default_pipeline
+        if body.provider:
+            try:
+                pipeline = pipeline_factory(body.provider)
+            except (ValueError, ImportError) as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"provider {body.provider!r} unavailable: {exc}",
+                ) from exc
+        else:
+            pipeline = default_pipeline
         try:
             doc, trace = pipeline.run(raw_doc)
         except PipelineError as exc:
@@ -281,8 +290,8 @@ def create_app(config: Config | None = None) -> FastAPI:
         results: list[ProviderResult] = []
         total_spend = 0.0
         for name in body.providers:
-            pipeline = pipeline_factory(name)
             try:
+                pipeline = pipeline_factory(name)
                 doc, trace = pipeline.run(raw_doc)
                 results.append(ProviderResult(provider=name, doc=doc, trace=trace))
                 total_spend += trace.total_cost_usd
@@ -290,6 +299,11 @@ def create_app(config: Config | None = None) -> FastAPI:
                 if exc.partial_trace is not None:
                     total_spend += exc.partial_trace.total_cost_usd
                 results.append(ProviderResult(provider=name, error=str(exc)))
+            except (ValueError, ImportError) as exc:
+                # A provider that is unknown or whose optional SDK isn't
+                # installed must not abort the OTHER providers' results --
+                # that isolation is the entire point of /compare.
+                results.append(ProviderResult(provider=name, error=f"unavailable: {exc}"))
         limiter.record_spend(total_spend)
         return CompareResponse(results=results)
 
