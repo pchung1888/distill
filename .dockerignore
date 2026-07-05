@@ -1,0 +1,23 @@
+# Keep the build context to what the Dockerfile actually copies:
+# pyproject.toml, uv.lock, README.md, src/.
+
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.venv
+.pytest_cache
+.ruff_cache
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+tests
+evals
+docs
+CLAUDE.md
+Dockerfile
+.dockerignore
+.env
+.env.*

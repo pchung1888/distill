@@ -1,0 +1,30 @@
+{
+  "draft": {
+    "summary": "In the Gettysburg Address, delivered on November 19, 1863, Abraham Lincoln recalls that four score and seven years ago the nation was founded, conceived in Liberty and dedicated to the proposition that all men are created equal. Speaking during a great civil war at the dedication of a battlefield cemetery, he says the brave men who struggled there consecrated the ground beyond anyone's power to add or detract, and calls on the living to resolve that the dead shall not have died in vain and that government of the people, by the people, for the people shall not perish from the earth.",
+    "key_points": [
+      "The nation was founded four score and seven years ago, conceived in Liberty and dedicated to the proposition that all men are created equal.",
+      "The country is engaged in a great civil war testing whether such a nation can long endure.",
+      "The occasion is the dedication of a portion of the battlefield as a final resting place for those who gave their lives there.",
+      "The brave men who struggled there have already consecrated the ground, far above the speakers' poor power to add or detract.",
+      "The living must dedicate themselves to the unfinished work and resolve that government of the people, by the people, for the people shall not perish from the earth."
+    ],
+    "entities": [
+      {"name": "Abraham Lincoln", "type": "person", "mentions": 1},
+      {"name": "Gettysburg", "type": "place", "mentions": 1},
+      {"name": "Soldiers' National Cemetery", "type": "place", "mentions": 1}
+    ],
+    "topics": ["gettysburg address", "civil war", "american history"]
+  },
+  "critic": {
+    "confidence": 0.88,
+    "faithful": true,
+    "issues": [],
+    "missing_points": []
+  },
+  "judge": {
+    "confidence": 0.90,
+    "faithful": true,
+    "issues": [],
+    "missing_points": ["The world will little note nor long remember what was said there."]
+  }
+}

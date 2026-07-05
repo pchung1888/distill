@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Test
+        run: uv run pytest -q
+
+      # Mock-mode evals gate harness+rubric MECHANICS (deterministic, offline);
+      # they do not measure real extraction quality -- live-provider runs do.
+      - name: Evals (mock provider -- harness mechanics gate)
+        run: uv run python evals/run_evals.py --provider mock
